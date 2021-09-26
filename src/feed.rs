@@ -1,14 +1,11 @@
 #![allow(dead_code)]
 extern crate minreq;
-extern crate quick_xml;
-extern crate serde;
+extern crate roxmltree;
 
 use std::io::prelude::*;
+#[warn(unused_imports)]
 use std::path::Path;
 use std::path::PathBuf;
-
-use quick_xml::de::{from_str, DeError};
-use serde::{Deserialize, Deserializer};
 
 pub struct Feed {
     is_url: bool,
@@ -35,43 +32,21 @@ impl Channel {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq)]
-pub struct Enclosure {
-    pub url: String,
-}
-
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Episode {
-    #[serde(rename="guid", default)]
-    guid: String,
-    // title: String,
-    #[serde(default)]
+    pub url: String,
+    pub title: String,
     pub description: String,
-    pub enclosure: Option<Enclosure>,
 }
 
-
-#[derive(Debug, Deserialize)]
-struct Link {
-    #[serde(rename = "$value")]
-    value: String,
-}
-
-#[derive(Debug, Deserialize, PartialEq)]
-struct ChannelXml {
-    title: String,
-    description: String,
-
-    #[serde(rename="$value")]
-    link: std::collections::BTreeMap<String, String>,
-
-    #[serde(rename = "item")]
-    episodes: Vec<Episode>,
-}
-
-#[derive(Debug, Deserialize, PartialEq)]
-struct PodcastXml {
-    channel: ChannelXml,
+impl Episode {
+    fn new<T: Into<String>>(title: T, description: T, url: T) -> Self {
+        Episode {
+            title: title.into(),
+            description: description.into(),
+            url: url.into(),
+        }
+    }
 }
 
 impl Feed {
@@ -112,34 +87,47 @@ impl Feed {
         let mut xml = String::new();
         reader.read_to_string(&mut xml).expect("couldn't read file");
 
-        let podcast: Option<PodcastXml> = match from_str(&xml) {
-            Ok(value) => value,
-            Err(e) => {
-                println!("{:?}", e);
-                None
-            }
-        };
+        self.parse_xml_string(&xml);
+    }
 
-        if podcast.is_none() {
+    fn parse_xml_string(&mut self, xml: &str) {
+        let doc: roxmltree::Document = roxmltree::Document::parse(&xml).unwrap();
+        let rss: roxmltree::Node = doc.root().first_child().unwrap();
+
+        // validate the root tag...
+        if rss.tag_name().name() != "rss" {
+            return;
+        }
+        // validate the rss version
+        if rss.attribute("version") != Some("2.0") {
             return;
         }
 
-        let podcast = podcast.unwrap();
+        for child in rss.children() {
+            if child.node_type() != roxmltree::NodeType::Element {
+                continue;
+            }
 
-        let episodes: Vec<Episode> = podcast
-            .channel
-            .episodes
-            .into_iter()
-            .filter(|e| e.enclosure.is_some())
-            .collect();
+            if child.tag_name().name() != "channel" {
+                continue;
+            }
 
-        self.channel = Channel {
-            link: String::new(), //podcast.channel.link,
-            title: podcast.channel.title,
-            description: podcast.channel.description,
-        };
+            for sub_child in child.children() {
+                match sub_child.tag_name().name() {
+                    "link" => self.channel.link = get_element_text(&sub_child).into(),
+                    "title" => self.channel.title = get_element_text(&sub_child).into(),
+                    "description" => self.channel.description = get_element_text(&sub_child).into(),
+                    "item" => {
+                        if let Some(episode) = item_to_episode(&sub_child) {
+                            self.episodes.push(episode);
+                        }
+                    }
+                    _ => (),
+                }
+            }
+        }
 
-        self.episodes = episodes;
+        // panic if there is no channel
     }
 
     fn parse_url_episodes(&mut self) {
@@ -154,37 +142,43 @@ impl Feed {
         let content = response
             .as_str()
             .expect("couldn't parse response to string");
-        //println!("{}", content);
 
-        let podcast: Option<PodcastXml> = match from_str(&content) {
-            Ok(value) => value,
-            Err(e) => {
-                println!("{:?}", e);
-                None
-            }
-        };
+        self.parse_xml_string(content);
+    }
+}
 
-        if podcast.is_none() {
-            return;
+fn get_element_text<'a>(element: &'a roxmltree::Node) -> &'a str {
+    match element.first_child() {
+        Some(child) => child.text().unwrap_or(""),
+        None => ""
+    }
+}
+
+fn item_to_episode(element: &roxmltree::Node) -> Option<Episode> {
+    let item = element.children();
+
+    let mut url = String::new();
+    let mut title = String::new();
+    let mut description = String::new();
+
+    for item_child in item {
+        if item_child.tag_name().name() == "" {
+            continue;
         }
 
-        let podcast = podcast.unwrap();
-
-        let episodes: Vec<Episode> = podcast
-            .channel
-            .episodes
-            .into_iter()
-            .filter(|e| e.enclosure.is_some())
-            .collect();
-
-        self.channel = Channel {
-            link: String::new(), //podcast.channel.link,
-            title: podcast.channel.title,
-            description: podcast.channel.description,
-        };
-
-        self.episodes = episodes;
+        match item_child.tag_name().name() {
+            "title" => title = item_child.first_child()?.text()?.into(),
+            "description" => description = item_child.first_child()?.text()?.into(),
+            "enclosure" => url = item_child.attribute("url")?.into(),
+            _ => (),
+        }
     }
+
+    if url == "" {
+        return None;
+    }
+
+    Some(Episode::new(title, description, url))
 }
 
 #[test]
@@ -276,15 +270,13 @@ fn test_feed_validations_channel_empty() {
     assert_eq!(feed.episodes.len(), 0);
 }
 
-/* INVALID for now...
 #[test]
 fn test_feed_validations_two_channels() {
     let path = Path::new("/mnt/ddrive/rust/cast/feeds/valid_two_channels.xml");
     let mut feed = Feed::from_path(path.to_path_buf());
     feed.parse_episodes();
-    println!("{:#?}", feed.episodes);
+    assert_eq!(feed.episodes.len(), 3);
 }
-*/
 
 #[test]
 fn test_feed_validations_item_title() {
