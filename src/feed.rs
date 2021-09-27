@@ -168,8 +168,8 @@ fn item_to_episode(element: &roxmltree::Node) -> Option<Episode> {
 
         match item_child.tag_name().name() {
             "title" => title = item_child.first_child()?.text()?.into(),
-            "description" => description = item_child.first_child()?.text()?.into(),
             "enclosure" => url = item_child.attribute("url")?.into(),
+            "description" => description = item_child.first_child()?.text()?.into(),
             _ => (),
         }
     }
