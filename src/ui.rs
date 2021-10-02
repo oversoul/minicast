@@ -31,13 +31,12 @@ impl<'a> FeedView<'a> {
     }
 
     pub fn draw(&self) -> List {
-        // Create a List from all list items and highlight the currently selected one
         let items: Vec<ListItem> = self.data.iter().map(|x| ListItem::new(*x)).collect();
 
-        return List::new(items)
+        List::new(items)
             .block(Block::default().title("Feeds").borders(Borders::ALL))
             .highlight_style(self.get_style())
-            .highlight_symbol(">> ");
+            .highlight_symbol(">> ")
     }
 
     pub fn in_focus(&mut self) -> bool {
@@ -79,12 +78,16 @@ impl EpisodeView {
 
     pub fn draw(&self) -> List {
         // Create a List from all list items and highlight the currently selected one
-        let items: Vec<ListItem> = self.data.iter().map(|x| ListItem::new(x.as_str())).collect();
+        let items: Vec<ListItem> = self
+            .data
+            .iter()
+            .map(|x| ListItem::new(x.as_str()))
+            .collect();
 
-        return List::new(items)
+        List::new(items)
             .block(Block::default().title("Episodes").borders(Borders::ALL))
             .highlight_style(self.get_style())
-            .highlight_symbol(">> ");
+            .highlight_symbol(">> ")
     }
 
     fn get_style(&self) -> Style {
@@ -125,3 +128,9 @@ pub fn top_sections(size: Rect) -> (Rect, Rect, Rect) {
     (sections[0], sections[1], sections[2])
 }
 
+pub fn player<'a>(ratio: f64) -> Gauge<'a> {
+    Gauge::default()
+        .block(Block::default().borders(Borders::ALL).title("Progress"))
+        .gauge_style(Style::default().fg(Color::Blue).bg(Color::Black))
+        .ratio(ratio)
+}

@@ -8,7 +8,6 @@ edition = "2018"
 [dependencies]
 roxmltree = "0.14.1"
 minreq = { version = "2.4.2", features = [ "https-rustls" ] }
-rodio = "0.14.0"
 tui = "0.16.0"
 termion = "1.5.6"
 mpv = "0.2.3"

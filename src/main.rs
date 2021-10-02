@@ -20,16 +20,11 @@ use tui::{
     backend::TermionBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Gauge, List, ListItem},
+    symbols,
+    widgets::{Block, Borders, Gauge, LineGauge, List, ListItem},
     Terminal,
 };
 
-// rodio
-use rodio::source::{SineWave, Source};
-use rodio::{Decoder, OutputStream, Sink};
-use std::fs::File;
-use std::io::BufReader;
-use std::time::Duration;
 
 fn main() {
     let url = "https://feeds.simplecast.com/sY509q85";
@@ -59,25 +54,18 @@ fn main() {
     let mut episode_state = State::new();
 
     let mut feed_view = FeedView::new(url, list_items);
-    let mut episodes: Vec<String> = vec![];
-    let mut episode_view = EpisodeView::new(episodes);
+    let mut episode_view = EpisodeView::new(vec![]);
 
     loop {
         terminal
             .draw(|f| {
                 let (top, bottom) = ui::main_layout(f.size());
                 let (left, middle, right) = ui::top_sections(top);
+                let block = Block::default().title("Metadata").borders(Borders::ALL);
+                let player = ui::player(media.percentage().unwrap_or(0.0) / 100.0);
 
                 f.render_stateful_widget(feed_view.draw(), left, &mut feed_state.value);
                 f.render_stateful_widget(episode_view.draw(), middle, &mut episode_state.value);
-
-                let block = Block::default().title("Metadata").borders(Borders::ALL);
-
-                let player = Gauge::default()
-                    .block(Block::default().borders(Borders::ALL).title("Progress"))
-                    .gauge_style(Style::default().fg(Color::Blue).bg(Color::Black))
-                    .ratio(media.percentage().unwrap_or(0.0) / 100.0);
-
                 f.render_widget(block, right);
                 f.render_widget(player, bottom);
             })
@@ -151,13 +139,6 @@ fn main() {
                         let url = feed.episodes[ep].url.as_str();
                         media.loadfile(url).unwrap();
                     }
-
-                    /*
-                    let ep_url = "https://cdn.simplecast.com/audio/fd7dca0e-5e82-4d04-b65f-c0aa44661798/episodes/fd0bd2ba-c553-466c-a060-b144797ce369/audio/4c6c7b70-68b7-41fe-8280-af8a9d476b0a/default_tc.mp3?aid=embed";
-                    media.loadfile(ep_url).unwrap();
-                    */
-                    // let state_value = feed_state.get_value();
-                    // player.play_url();
                 }
                 _ => {}
             },
