@@ -1,38 +1,40 @@
 use crate::feed::{Episode, Feed};
 
-pub struct App {
-    feed: Option<Feed>,
+pub struct App<'a> {
+    pub feed: Option<&'a Feed>,
+    feeds: Vec<Feed>,
     episode_title: String,
     episode_description: String,
 }
 
-impl App {
+impl<'a> App<'a> {
     pub fn new() -> Self {
         App {
             feed: None,
+            feeds: vec![],
             episode_title: "".into(),
             episode_description: "".into(),
         }
     }
 
-    pub fn load_feed(&mut self, url: &str) {
-        let mut feed = Feed::from_url(url);
-        feed.parse_episodes();
-        self.set_feed(feed);
+    pub fn set_feeds(&mut self, feeds: Vec<Feed>) {
+        self.feeds = feeds;
     }
 
-    pub fn set_feed(&mut self, feed: Feed) {
-        self.feed = Some(feed);
+    pub fn get_feed_by_idx(&mut self, idx: usize) -> Feed {
+        let feed = &mut self.feeds[idx];
+        Feed {
+            name: feed.name.clone(),
+            url: feed.url.clone(),
+            is_url: feed.is_url,
+            path: feed.path.clone(),
+            channel: feed.channel.clone(),
+            episodes: feed.parse_episodes(),
+        }
     }
 
-    pub fn get_episodes_title(&self) -> Vec<String> {
-        self.feed
-            .as_ref()
-            .unwrap()
-            .episodes
-            .iter()
-            .map(|e| format!("{}", e.title))
-            .collect()
+    pub fn get_feeds_name(&self) -> Vec<&str> {
+        self.feeds.iter().map(|e| e.name.as_str()).collect()
     }
 
     pub fn get_episode_by_index(&self, idx: usize) -> Episode {

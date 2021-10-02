@@ -7,15 +7,17 @@ use std::io::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
 
+#[derive(Clone)]
 pub struct Feed {
-    is_url: bool,
-    url: String,
-    path: PathBuf,
-    channel: Channel,
+    pub is_url: bool,
+    pub url: String,
+    pub name: String,
+    pub path: PathBuf,
+    pub channel: Channel,
     pub episodes: Vec<Episode>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Channel {
     title: String,
     description: String,
@@ -32,7 +34,7 @@ impl Channel {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Episode {
     pub url: String,
     pub title: String,
@@ -58,58 +60,78 @@ impl Episode {
 }
 
 impl Feed {
-    pub fn from_url<T: Into<String>>(url: T) -> Self {
+    pub fn from_url<T: Into<String>>(name: T, url: T) -> Self {
         Feed {
             url: url.into(),
-            path: PathBuf::new(),
+            name: name.into(),
             is_url: true,
-            channel: Channel::new(),
+            path: PathBuf::new(),
             episodes: vec![],
+            channel: Channel::new(),
         }
-        // validate?
     }
 
-    pub fn from_path(path: PathBuf) -> Self {
+    pub fn from_path<T: Into<String>>(name: T, path: PathBuf) -> Self {
         Feed {
             path,
+            name: name.into(),
             url: String::new(),
             is_url: false,
             channel: Channel::new(),
             episodes: vec![],
         }
-        // validate?
     }
 
-    pub fn parse_episodes(&mut self) {
+    pub fn get_episode_by_index(&self, idx: usize) -> Episode {
+        Episode::new_from_ref(&self.episodes[idx])
+    }
+
+    pub fn get_episodes_title(&self) -> Vec<String> {
+        self.episodes
+            .iter()
+            .map(|e| format!("{}", e.title))
+            .collect()
+    }
+
+    pub fn parse_episodes(&mut self) -> Vec<Episode> {
         if self.is_url {
-            self.parse_url_episodes();
+            self.parse_url_episodes()
         } else {
-            self.parse_path_episodes();
+            self.parse_path_episodes()
         }
     }
 
-    fn parse_path_episodes(&mut self) {
+    fn parse_path_episodes(&mut self) -> Vec<Episode> {
         let path = self.path.to_path_buf();
-        let file = std::fs::File::open(path).expect("Couldn't open file");
+        let file = std::fs::File::open(path).expect("File not found");
+
         let mut reader = std::io::BufReader::new(file);
         let mut xml = String::new();
         reader.read_to_string(&mut xml).expect("couldn't read file");
 
-        self.parse_xml_string(&xml);
+        self.parse_xml_string(&xml)
     }
 
-    fn parse_xml_string(&mut self, xml: &str) {
-        let doc: roxmltree::Document = roxmltree::Document::parse(&xml).unwrap();
+    fn parse_xml_string(&mut self, xml: &str) -> Vec<Episode> {
+        let doc: Result<roxmltree::Document, roxmltree::Error> = roxmltree::Document::parse(&xml);
+
+        if doc.is_err() {
+            return vec![];
+        }
+
+        let doc = doc.unwrap();
         let rss: roxmltree::Node = doc.root().first_child().unwrap();
 
         // validate the root tag...
         if rss.tag_name().name() != "rss" {
-            return;
+            return vec![];
         }
         // validate the rss version
         if rss.attribute("version") != Some("2.0") {
-            return;
+            return vec![];
         }
+
+        let mut episodes = vec![];
 
         for child in rss.children() {
             if child.node_type() != roxmltree::NodeType::Element {
@@ -127,7 +149,7 @@ impl Feed {
                     "description" => self.channel.description = get_element_text(&sub_child).into(),
                     "item" => {
                         if let Some(episode) = item_to_episode(&sub_child) {
-                            self.episodes.push(episode);
+                            episodes.push(episode);
                         }
                     }
                     _ => (),
@@ -135,23 +157,26 @@ impl Feed {
             }
         }
 
+        episodes
         // panic if there is no channel
     }
 
-    fn parse_url_episodes(&mut self) {
-        let response: minreq::Response = minreq::get(&self.url)
-            .send()
-            .expect("something went wrong url");
-        if response.status_code != 200 {
-            println!("response status is not 200");
-            return;
+    fn parse_url_episodes(&mut self) -> Vec<Episode> {
+        let response: Result<minreq::Response, minreq::Error> = minreq::get(&self.url).send();
+        if response.is_err() {
+            return vec![];
         }
 
-        let content = response
-            .as_str()
-            .expect("couldn't parse response to string");
+        let response = response.unwrap();
 
-        self.parse_xml_string(content);
+        if response.status_code != 200 {
+            return vec![];
+        }
+
+        match response.as_str() {
+            Ok(content) => self.parse_xml_string(content),
+            Err(_) => vec![],
+        }
     }
 }
 
@@ -192,15 +217,15 @@ fn item_to_episode(element: &roxmltree::Node) -> Option<Episode> {
 #[test]
 fn can_create_new_instance_from_url() {
     let url = "http://example.com";
-    let feed = Feed::from_url(url);
+    let feed = Feed::from_url("test", url);
     assert_eq!(feed.is_url, true);
     assert_eq!(feed.url, url);
 }
 
 #[test]
 fn can_create_new_instance_from_path() {
-    let path = Path::new("../feeds/valid_basic.xml");
-    let feed = Feed::from_path(path.to_path_buf());
+    let path = Path::new("/mnt/ddrive/rust/minicast/feeds/valid_basic.xml");
+    let feed = Feed::from_path("test", path.to_path_buf());
     assert_eq!(feed.is_url, false);
     assert_eq!(feed.path, path);
 }
@@ -208,7 +233,7 @@ fn can_create_new_instance_from_path() {
 #[test]
 fn can_parse_xml_files() {
     let path = Path::new("/mnt/ddrive/rust/minicast/feeds/valid_basic.xml");
-    let mut feed = Feed::from_path(path.to_path_buf());
+    let mut feed = Feed::from_path("test", path.to_path_buf());
     feed.parse_episodes();
     assert_eq!(feed.episodes.len(), 3);
 }
@@ -216,7 +241,7 @@ fn can_parse_xml_files() {
 #[test]
 fn test_feed_validation_complete() {
     let path = Path::new("/mnt/ddrive/rust/minicast/feeds/valid_complete.xml");
-    let mut feed = Feed::from_path(path.to_path_buf());
+    let mut feed = Feed::from_path("test", path.to_path_buf());
     feed.parse_episodes();
     assert_eq!(feed.episodes.len(), 3);
 }
@@ -224,7 +249,7 @@ fn test_feed_validation_complete() {
 #[test]
 fn test_feed_validation_valid_mixed_enclosure() {
     let path = Path::new("/mnt/ddrive/rust/minicast/feeds/valid_mixed_enclosures.xml");
-    let mut feed = Feed::from_path(path.to_path_buf());
+    let mut feed = Feed::from_path("test", path.to_path_buf());
     feed.parse_episodes();
     assert_eq!(feed.episodes.len(), 2);
 }
@@ -232,7 +257,7 @@ fn test_feed_validation_valid_mixed_enclosure() {
 #[test]
 fn test_feed_validations_is_rss() {
     let path = Path::new("/mnt/ddrive/rust/minicast/feeds/broken_is_rss.xml");
-    let mut feed = Feed::from_path(path.to_path_buf());
+    let mut feed = Feed::from_path("test", path.to_path_buf());
     feed.parse_episodes();
     assert_eq!(feed.episodes.len(), 0);
 }
@@ -240,7 +265,7 @@ fn test_feed_validations_is_rss() {
 #[test]
 fn test_feed_validations_is_v2() {
     let path = Path::new("/mnt/ddrive/rust/minicast/feeds/broken_is_v2.xml");
-    let mut feed = Feed::from_path(path.to_path_buf());
+    let mut feed = Feed::from_path("test", path.to_path_buf());
     feed.parse_episodes();
     assert_eq!(feed.episodes.len(), 0);
 }
@@ -248,7 +273,7 @@ fn test_feed_validations_is_v2() {
 #[test]
 fn test_feed_validations_rss_empty() {
     let path = Path::new("/mnt/ddrive/rust/minicast/feeds/broken_rss_empty.xml");
-    let mut feed = Feed::from_path(path.to_path_buf());
+    let mut feed = Feed::from_path("test", path.to_path_buf());
     feed.parse_episodes();
     // should show an error
     assert_eq!(feed.episodes.len(), 0);
@@ -257,7 +282,7 @@ fn test_feed_validations_rss_empty() {
 #[test]
 fn test_feed_validations_has_channel() {
     let path = Path::new("/mnt/ddrive/rust/minicast/feeds/broken_has_channel.xml");
-    let mut feed = Feed::from_path(path.to_path_buf());
+    let mut feed = Feed::from_path("test", path.to_path_buf());
     feed.parse_episodes();
     assert_eq!(feed.episodes.len(), 0);
 }
@@ -265,7 +290,7 @@ fn test_feed_validations_has_channel() {
 #[test]
 fn test_feed_validations_channel_children() {
     let path = Path::new("/mnt/ddrive/rust/minicast/feeds/broken_channel_children.xml");
-    let mut feed = Feed::from_path(path.to_path_buf());
+    let mut feed = Feed::from_path("test", path.to_path_buf());
     feed.parse_episodes();
     assert_eq!(feed.episodes.len(), 0);
 }
@@ -273,7 +298,7 @@ fn test_feed_validations_channel_children() {
 #[test]
 fn test_feed_validations_channel_empty() {
     let path = Path::new("/mnt/ddrive/rust/minicast/feeds/broken_channel_empty.xml");
-    let mut feed = Feed::from_path(path.to_path_buf());
+    let mut feed = Feed::from_path("test", path.to_path_buf());
     feed.parse_episodes();
     assert_eq!(feed.episodes.len(), 0);
 }
@@ -281,7 +306,7 @@ fn test_feed_validations_channel_empty() {
 #[test]
 fn test_feed_validations_two_channels() {
     let path = Path::new("/mnt/ddrive/rust/minicast/feeds/valid_two_channels.xml");
-    let mut feed = Feed::from_path(path.to_path_buf());
+    let mut feed = Feed::from_path("test", path.to_path_buf());
     feed.parse_episodes();
     assert_eq!(feed.episodes.len(), 3);
 }
@@ -289,7 +314,7 @@ fn test_feed_validations_two_channels() {
 #[test]
 fn test_feed_validations_item_title() {
     let path = Path::new("/mnt/ddrive/rust/minicast/feeds/broken_item_title.xml");
-    let mut feed = Feed::from_path(path.to_path_buf());
+    let mut feed = Feed::from_path("test", path.to_path_buf());
     feed.parse_episodes();
     assert_eq!(feed.episodes.len(), 0);
 }
@@ -298,6 +323,6 @@ fn test_feed_validations_item_title() {
 #[should_panic]
 fn test_feed_load_error() {
     let path = Path::new("notfound");
-    let mut feed = Feed::from_path(path.to_path_buf());
+    let mut feed = Feed::from_path("test", path.to_path_buf());
     feed.parse_episodes();
 }

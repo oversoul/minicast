@@ -9,6 +9,7 @@ mod player;
 mod state;
 mod ui;
 
+use feed::Feed;
 use player::MediaWorker;
 use state::State;
 use ui::{EpisodeView, FeedView};
@@ -18,10 +19,6 @@ use termion::{event::Key, input::MouseTerminal, raw::IntoRawMode, screen::Altern
 use tui::{backend::TermionBackend, Terminal};
 
 fn main() {
-    let url = "https://feeds.simplecast.com/sY509q85";
-    // let url = "https://feeds.megaphone.fm/stuffyoushouldknow";
-    // let url = "https://www.ted.com/feeds/talks.rss";
-
     //let url = "https://rss.art19.com/smartless";
 
     // Terminal initialization
@@ -33,24 +30,39 @@ fn main() {
 
     let events = Events::new();
     let mut app = app::App::new();
+
+    let feeds = [
+        Feed::from_url("Laracasts", "https://feeds.simplecast.com/sY509q85"),
+        Feed::from_url(
+            "Stuff You Should Know",
+            "https://feeds.megaphone.fm/stuffyoushouldknow",
+        ),
+        Feed::from_url("TED Talks Daily", "https://www.ted.com/feeds/talks.rss"),
+        Feed::from_url("Smartless", "https://rss.art19.com/smartless"),
+    ];
+
+    app.set_feeds(feeds.to_vec());
+
+    let feeds_len = &feeds.len();
+
     let mut media = MediaWorker::new().expect("Couldn't open media worker");
 
-    let list_items = &["Laracasts"];
-
     let mut feed_state = State::new();
-    feed_state.set_max(list_items.len());
+    feed_state.set_max(*feeds_len);
 
     let mut episode_state = State::new();
+    let mut feed_view = FeedView::new(feeds.iter().map(|f| f.name.as_str()).collect());
 
-    let mut feed_view = FeedView::new(url, list_items);
     let mut episode_view = EpisodeView::new(vec![]);
+
+    let mut feed: Option<Feed> = None;
+    let mut title = String::from("");
+    let mut description = String::from("");
 
     loop {
         terminal
             .draw(|f| {
-                let meta_data = match app.get_current_episode_meta() {
-                    (title, description) => ui::meta_data(title, description),
-                };
+                let meta_data = ui::meta_data(title.as_str(), description.as_str());
 
                 let (top, bottom) = ui::main_layout(f.size());
                 let (left, middle, right) = ui::top_sections(top);
@@ -104,9 +116,9 @@ fn main() {
                 }
                 Key::Char('\n') => {
                     if feed_view.in_focus() {
-                        app.load_feed(url);
+                        feed = Some(app.get_feed_by_idx(feed_state.get_value()));
 
-                        let episodes = app.get_episodes_title();
+                        let episodes = feed.as_ref().unwrap().get_episodes_title();
                         let eps_len = &episodes.len();
 
                         feed_view.set_focus(false);
@@ -115,8 +127,11 @@ fn main() {
                         episode_view.set_data(episodes);
                     } else {
                         let ep = episode_state.get_value();
-                        let episode = app.get_episode_by_index(ep);
-                        app.set_playing_episode_meta(episode.title, episode.description);
+
+                        let episode = feed.as_ref().unwrap().get_episode_by_index(ep);
+                        title = episode.title.to_owned();
+                        description = episode.description.to_owned();
+                        //app.set_playing_episode_meta(episode.title, episode.description);
 
                         let url = episode.url.as_str();
                         media.loadfile(url).unwrap();
@@ -125,8 +140,8 @@ fn main() {
                 _ => {}
             },
             Ok(Event::Tick) => {}
-            Err(_) => {
-                break;
+            Err(e) => {
+                panic!("{:?}", e);
             }
         }
     }

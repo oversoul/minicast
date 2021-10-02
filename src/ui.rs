@@ -9,21 +9,16 @@ use tui::{
 };
 
 pub struct FeedView<'a> {
-    name: &'a str,
     focus: bool,
-    data: &'a [&'a str],
+    data: Vec<&'a str>,
 }
 
 impl<'a> FeedView<'a> {
-    pub fn new(name: &'a str, data: &'a [&'a str]) -> Self {
-        FeedView {
-            name,
-            data,
-            focus: true,
-        }
+    pub fn new(data: Vec<&'a str>) -> Self {
+        FeedView { data, focus: true }
     }
 
-    pub fn set_data(&mut self, data: &'a [&'a str]) {
+    pub fn set_data(&mut self, data: Vec<&'a str>) {
         self.data = data;
     }
 
