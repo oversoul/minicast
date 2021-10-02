@@ -11,3 +11,4 @@ minreq = { version = "2.4.2", features = [ "https-rustls" ] }
 tui = "0.16.0"
 termion = "1.5.6"
 mpv = "0.2.3"
+libmpv = "2.0.1"

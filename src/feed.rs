@@ -3,7 +3,7 @@ extern crate minreq;
 extern crate roxmltree;
 
 use std::io::prelude::*;
-#[warn(unused_imports)]
+#[cfg(test)]
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -45,6 +45,14 @@ impl Episode {
             title: title.into(),
             description: description.into(),
             url: url.into(),
+        }
+    }
+
+    pub fn new_from_ref(episode: &Episode) -> Self {
+        Episode {
+            url: episode.url.to_string(),
+            title: episode.title.to_string(),
+            description: episode.description.to_string(),
         }
     }
 }
@@ -150,7 +158,7 @@ impl Feed {
 fn get_element_text<'a>(element: &'a roxmltree::Node) -> &'a str {
     match element.first_child() {
         Some(child) => child.text().unwrap_or(""),
-        None => ""
+        None => "",
     }
 }
 

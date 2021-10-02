@@ -1,14 +1,11 @@
 #![allow(dead_code)]
 #![warn(unused_imports)]
 
-use std::{error::Error, io};
-use termion::{event::Key, input::MouseTerminal, raw::IntoRawMode, screen::AlternateScreen};
 use tui::{
-    backend::TermionBackend,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Gauge, List, ListItem},
-    Terminal,
+    text,
+    widgets::{Block, Borders, Gauge, List, ListItem, Paragraph, Wrap},
 };
 
 pub struct FeedView<'a> {
@@ -133,4 +130,40 @@ pub fn player<'a>(ratio: f64) -> Gauge<'a> {
         .block(Block::default().borders(Borders::ALL).title("Progress"))
         .gauge_style(Style::default().fg(Color::Blue).bg(Color::Black))
         .ratio(ratio)
+}
+
+pub fn meta_data<'a, T: Into<String>>(title: T, description: T) -> Paragraph<'a> {
+    let title = title.into();
+    let description = description.into();
+    let block = Block::default().title("Metadata").borders(Borders::ALL);
+
+    if title.len() == 0 {
+        return Paragraph::new(vec![]).block(block);
+    }
+
+    let bold_style = Style::default().add_modifier(Modifier::BOLD);
+
+    let text = vec![
+        text::Spans::from(text::Span::styled("Title:", bold_style)),
+        text::Spans::from(title),
+        text::Spans::from(vec![]),
+        text::Spans::from(text::Span::styled("Description:", bold_style)),
+        text::Spans::from(description),
+    ];
+
+    Paragraph::new(text)
+        .block(block)
+        .style(Style::default().fg(Color::White).bg(Color::Black))
+        .alignment(Alignment::Left)
+        .wrap(Wrap { trim: true })
+}
+
+pub fn player_progress<'a, T: Into<String>>(position: T) -> Paragraph<'a> {
+    let text = vec![text::Spans::from(position.into())];
+
+    Paragraph::new(text)
+        .block(Block::default().title("Player").borders(Borders::ALL))
+        .style(Style::default().fg(Color::White).bg(Color::Black))
+        .alignment(Alignment::Left)
+        .wrap(Wrap { trim: true })
 }

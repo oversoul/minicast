@@ -2,29 +2,20 @@
 #![warn(unused_imports)]
 extern crate tui;
 
+mod app;
 mod events;
 mod feed;
 mod player;
 mod state;
 mod ui;
 
-use feed::Feed;
 use player::MediaWorker;
 use state::State;
 use ui::{EpisodeView, FeedView};
 
 use events::{Event, Events};
-use std::{error::Error, io};
 use termion::{event::Key, input::MouseTerminal, raw::IntoRawMode, screen::AlternateScreen};
-use tui::{
-    backend::TermionBackend,
-    layout::{Constraint, Direction, Layout},
-    style::{Color, Modifier, Style},
-    symbols,
-    widgets::{Block, Borders, Gauge, LineGauge, List, ListItem},
-    Terminal,
-};
-
+use tui::{backend::TermionBackend, Terminal};
 
 fn main() {
     let url = "https://feeds.simplecast.com/sY509q85";
@@ -34,16 +25,14 @@ fn main() {
     //let url = "https://rss.art19.com/smartless";
 
     // Terminal initialization
-    let stdout = io::stdout().into_raw_mode().expect("std out");
+    let stdout = std::io::stdout().into_raw_mode().expect("std out");
     let stdout = MouseTerminal::from(stdout);
     let stdout = AlternateScreen::from(stdout);
     let backend = TermionBackend::new(stdout);
     let mut terminal = Terminal::new(backend).expect("terminal...");
 
     let events = Events::new();
-
-    // let (_stream, stream_handle) = OutputStream::try_default().unwrap();
-    // let mut player = Player::new(&stream_handle);
+    let mut app = app::App::new();
     let mut media = MediaWorker::new().expect("Couldn't open media worker");
 
     let list_items = &["Laracasts"];
@@ -59,14 +48,17 @@ fn main() {
     loop {
         terminal
             .draw(|f| {
+                let meta_data = match app.get_current_episode_meta() {
+                    (title, description) => ui::meta_data(title, description),
+                };
+
                 let (top, bottom) = ui::main_layout(f.size());
                 let (left, middle, right) = ui::top_sections(top);
-                let block = Block::default().title("Metadata").borders(Borders::ALL);
-                let player = ui::player(media.percentage().unwrap_or(0.0) / 100.0);
+                let player = ui::player_progress(media.time_position().unwrap_or("".into()));
 
                 f.render_stateful_widget(feed_view.draw(), left, &mut feed_state.value);
                 f.render_stateful_widget(episode_view.draw(), middle, &mut episode_state.value);
-                f.render_widget(block, right);
+                f.render_widget(meta_data, right);
                 f.render_widget(player, bottom);
             })
             .expect("terminal loop...");
@@ -108,42 +100,34 @@ fn main() {
                     media.toggle_play().expect("toggle play issue");
                 }
                 Key::Char('s') => {
-                    media.stop().expect("Couldn't stop.");
+                    media.stop().expect("Couldn't quit.");
                 }
                 Key::Char('\n') => {
                     if feed_view.in_focus() {
-                        let mut feed = Feed::from_url(url);
+                        app.load_feed(url);
 
-                        feed.parse_episodes();
-
-                        let ep_len = feed.episodes.len();
-                        let episodes = feed
-                            .episodes
-                            .iter()
-                            .map(|e| format!("{}", e.title))
-                            .collect();
+                        let episodes = app.get_episodes_title();
+                        let eps_len = &episodes.len();
 
                         feed_view.set_focus(false);
                         episode_view.set_focus(true);
+                        episode_state.set_max(*eps_len);
                         episode_view.set_data(episodes);
-                        episode_state.set_max(ep_len);
                     } else {
-                        media.stop().expect("couldn't stop");
                         let ep = episode_state.get_value();
+                        let episode = app.get_episode_by_index(ep);
+                        app.set_playing_episode_meta(episode.title, episode.description);
 
-                        // temporary
-                        let mut feed = Feed::from_url(url);
-
-                        feed.parse_episodes();
-
-                        let url = feed.episodes[ep].url.as_str();
+                        let url = episode.url.as_str();
                         media.loadfile(url).unwrap();
                     }
                 }
                 _ => {}
             },
             Ok(Event::Tick) => {}
-            Err(_) => {}
+            Err(_) => {
+                break;
+            }
         }
     }
 }
