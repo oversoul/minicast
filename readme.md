@@ -3,7 +3,7 @@
 
 ## Motivation
 
-In my qest to learn more rust, i figured this was a cool project idea to work on. also being
+In my journey to learn more rust, i figured this was a cool project idea to work on. also being
 a fan of lightweight terminal based programs. why not a Podcast manager & player.
 
 
