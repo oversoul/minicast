@@ -3,8 +3,6 @@ extern crate minreq;
 extern crate roxmltree;
 
 use std::io::prelude::*;
-#[cfg(test)]
-use std::path::Path;
 use std::path::PathBuf;
 
 #[derive(Clone)]
@@ -214,6 +212,11 @@ fn item_to_episode(element: &roxmltree::Node) -> Option<Episode> {
     Some(Episode::new(title, description, url))
 }
 
+#[cfg(test)]
+use std::env;
+#[cfg(test)]
+use std::path::Path;
+
 #[test]
 fn can_create_new_instance_from_url() {
     let url = "http://example.com";
@@ -224,99 +227,112 @@ fn can_create_new_instance_from_url() {
 
 #[test]
 fn can_create_new_instance_from_path() {
-    let path = Path::new("/mnt/ddrive/rust/minicast/feeds/valid_basic.xml");
-    let feed = Feed::from_path("test", path.to_path_buf());
+    let mut root_path = env::current_dir().expect("something is wrong with finding current dir.");
+    let path = Path::new("/feeds/valid_basic.xml");
+    root_path.push(path);
+
+    let feed = Feed::from_path("test", root_path.to_path_buf());
     assert_eq!(feed.is_url, false);
     assert_eq!(feed.path, path);
 }
 
 #[test]
 fn can_parse_xml_files() {
-    let path = Path::new("/mnt/ddrive/rust/minicast/feeds/valid_basic.xml");
+    let root_path = env::current_dir().expect("something is wrong with finding current dir.");
+    let path = root_path.join("feeds/valid_basic.xml");
     let mut feed = Feed::from_path("test", path.to_path_buf());
-    feed.parse_episodes();
-    assert_eq!(feed.episodes.len(), 3);
+    let episodes = feed.parse_episodes();
+    assert_eq!(episodes.len(), 3);
 }
 
 #[test]
 fn test_feed_validation_complete() {
-    let path = Path::new("/mnt/ddrive/rust/minicast/feeds/valid_complete.xml");
+    let root_path = env::current_dir().expect("something is wrong with finding current dir.");
+    let path = root_path.join("feeds/valid_basic.xml");
     let mut feed = Feed::from_path("test", path.to_path_buf());
-    feed.parse_episodes();
-    assert_eq!(feed.episodes.len(), 3);
+    let episodes = feed.parse_episodes();
+    assert_eq!(episodes.len(), 3);
 }
 
 #[test]
 fn test_feed_validation_valid_mixed_enclosure() {
-    let path = Path::new("/mnt/ddrive/rust/minicast/feeds/valid_mixed_enclosures.xml");
+    let root_path = env::current_dir().expect("something is wrong with finding current dir.");
+    let path = root_path.join("feeds/valid_mixed_enclosures.xml");
     let mut feed = Feed::from_path("test", path.to_path_buf());
-    feed.parse_episodes();
-    assert_eq!(feed.episodes.len(), 2);
+    let episodes = feed.parse_episodes();
+    assert_eq!(episodes.len(), 2);
 }
 
 #[test]
 fn test_feed_validations_is_rss() {
-    let path = Path::new("/mnt/ddrive/rust/minicast/feeds/broken_is_rss.xml");
+    let root_path = env::current_dir().expect("something is wrong with finding current dir.");
+    let path = root_path.join("feeds/broken_is_rss.xml");
     let mut feed = Feed::from_path("test", path.to_path_buf());
-    feed.parse_episodes();
-    assert_eq!(feed.episodes.len(), 0);
+    let episodes = feed.parse_episodes();
+    assert_eq!(episodes.len(), 0);
 }
 
 #[test]
 fn test_feed_validations_is_v2() {
-    let path = Path::new("/mnt/ddrive/rust/minicast/feeds/broken_is_v2.xml");
+    let root_path = env::current_dir().expect("something is wrong with finding current dir.");
+    let path = root_path.join("feeds/broken_is_v2.xml");
     let mut feed = Feed::from_path("test", path.to_path_buf());
-    feed.parse_episodes();
-    assert_eq!(feed.episodes.len(), 0);
+    let episodes = feed.parse_episodes();
+    assert_eq!(episodes.len(), 0);
 }
 
 #[test]
 fn test_feed_validations_rss_empty() {
-    let path = Path::new("/mnt/ddrive/rust/minicast/feeds/broken_rss_empty.xml");
+    let root_path = env::current_dir().expect("something is wrong with finding current dir.");
+    let path = root_path.join("feeds/broken_rss_empty.xml");
     let mut feed = Feed::from_path("test", path.to_path_buf());
-    feed.parse_episodes();
-    // should show an error
-    assert_eq!(feed.episodes.len(), 0);
+    let episodes = feed.parse_episodes();
+    assert_eq!(episodes.len(), 0);
 }
 
 #[test]
 fn test_feed_validations_has_channel() {
-    let path = Path::new("/mnt/ddrive/rust/minicast/feeds/broken_has_channel.xml");
+    let root_path = env::current_dir().expect("something is wrong with finding current dir.");
+    let path = root_path.join("feeds/broken_has_channel.xml");
     let mut feed = Feed::from_path("test", path.to_path_buf());
-    feed.parse_episodes();
-    assert_eq!(feed.episodes.len(), 0);
+    let episodes = feed.parse_episodes();
+    assert_eq!(episodes.len(), 0);
 }
 
 #[test]
 fn test_feed_validations_channel_children() {
-    let path = Path::new("/mnt/ddrive/rust/minicast/feeds/broken_channel_children.xml");
+    let root_path = env::current_dir().expect("something is wrong with finding current dir.");
+    let path = root_path.join("feeds/broken_channel_children.xml");
     let mut feed = Feed::from_path("test", path.to_path_buf());
-    feed.parse_episodes();
-    assert_eq!(feed.episodes.len(), 0);
+    let episodes = feed.parse_episodes();
+    assert_eq!(episodes.len(), 0);
 }
 
 #[test]
 fn test_feed_validations_channel_empty() {
-    let path = Path::new("/mnt/ddrive/rust/minicast/feeds/broken_channel_empty.xml");
+    let root_path = env::current_dir().expect("something is wrong with finding current dir.");
+    let path = root_path.join("feeds/broken_channel_empty.xml");
     let mut feed = Feed::from_path("test", path.to_path_buf());
-    feed.parse_episodes();
-    assert_eq!(feed.episodes.len(), 0);
+    let episodes = feed.parse_episodes();
+    assert_eq!(episodes.len(), 0);
 }
 
 #[test]
 fn test_feed_validations_two_channels() {
-    let path = Path::new("/mnt/ddrive/rust/minicast/feeds/valid_two_channels.xml");
+    let root_path = env::current_dir().expect("something is wrong with finding current dir.");
+    let path = root_path.join("feeds/valid_two_channels.xml");
     let mut feed = Feed::from_path("test", path.to_path_buf());
-    feed.parse_episodes();
-    assert_eq!(feed.episodes.len(), 3);
+    let episodes = feed.parse_episodes();
+    assert_eq!(episodes.len(), 3);
 }
 
 #[test]
 fn test_feed_validations_item_title() {
-    let path = Path::new("/mnt/ddrive/rust/minicast/feeds/broken_item_title.xml");
+    let root_path = env::current_dir().expect("something is wrong with finding current dir.");
+    let path = root_path.join("feeds/broken_item_title.xml");
     let mut feed = Feed::from_path("test", path.to_path_buf());
-    feed.parse_episodes();
-    assert_eq!(feed.episodes.len(), 0);
+    let episodes = feed.parse_episodes();
+    assert_eq!(episodes.len(), 0);
 }
 
 #[test]

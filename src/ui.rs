@@ -28,7 +28,6 @@ impl<'a> FeedView<'a> {
         List::new(items)
             .block(Block::default().title("Feeds").borders(Borders::ALL))
             .highlight_style(self.get_style())
-            .highlight_symbol(">> ")
     }
 
     pub fn in_focus(&mut self) -> bool {
@@ -79,7 +78,6 @@ impl EpisodeView {
         List::new(items)
             .block(Block::default().title("Episodes").borders(Borders::ALL))
             .highlight_style(self.get_style())
-            .highlight_symbol(">> ")
     }
 
     fn get_style(&self) -> Style {

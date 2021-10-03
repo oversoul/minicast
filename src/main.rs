@@ -39,6 +39,7 @@ fn main() {
         ),
         Feed::from_url("TED Talks Daily", "https://www.ted.com/feeds/talks.rss"),
         Feed::from_url("Smartless", "https://rss.art19.com/smartless"),
+        Feed::from_url("Invisibllia", "https://feeds.npr.org/510307/podcast.xml"),
     ];
 
     app.set_feeds(feeds.to_vec());
