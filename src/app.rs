@@ -2,32 +2,28 @@ use crate::db::{Database, Episode};
 use crate::feed;
 use crate::feed::Feed;
 
-pub struct App<'a> {
-    pub feed: Option<&'a Feed>,
-    feeds: Vec<Feed>,
+pub struct App {
+    db: Database,
     episode_title: String,
     episode_description: String,
-    db: Database,
 }
 
-impl<'a> App<'a> {
+impl App {
     pub fn new() -> Self {
         App {
-            feed: None,
-            feeds: vec![],
             episode_title: "".into(),
             episode_description: "".into(),
             db: Database::new().expect("wrong"),
         }
     }
 
-    pub fn get_feed_id(&mut self, idx: usize) -> u32 {
+    pub fn get_feed_id(&self, idx: usize) -> u32 {
         let feed = &self.db.get_feeds()[idx];
         feed.id
     }
 
     pub fn get_episode_id(&mut self, feed_id: u32, idx: usize) -> u32 {
-        let episodes: Vec<Episode> = self.db.get_episodes(feed_id);
+        let episodes = self.db.get_episodes(feed_id);
         episodes[idx].id
     }
 
