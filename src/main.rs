@@ -38,19 +38,17 @@ fn main() {
     let mut media = MediaWorker::new().expect("Couldn't open media worker");
 
     let feeds = app.get_feeds_name();
-    let feeds_len = feeds.len();
     let mut feed_state = State::new();
-    feed_state.set_max(feeds_len);
+    feed_state.set_max(feeds.len());
 
     let mut episode_state = State::new();
     let mut feed_view = FeedView::new(feeds);
-
     let mut episode_view = EpisodeView::new(vec![]);
 
+    let mut show_popup = false;
     let mut feed: Option<u32> = None;
     let mut title = String::from("");
     let mut description = String::from("");
-    let mut show_popup = false;
 
     loop {
         terminal

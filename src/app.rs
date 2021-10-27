@@ -18,8 +18,8 @@ impl App {
     }
 
     pub fn get_feed_id(&self, idx: usize) -> u32 {
-        let feed = &self.db.get_feeds()[idx];
-        feed.id
+        let feeds = self.db.get_feeds();
+        feeds[idx].id
     }
 
     pub fn get_episode_id(&mut self, feed_id: u32, idx: usize) -> u32 {
@@ -34,7 +34,7 @@ impl App {
 
         let episodes = match feed {
             Ok(f) => feed::get_episodes(Feed::Url(f.url)),
-            _ => vec![],
+            Err(_) => vec![],
         };
 
         let episodes = episodes
@@ -69,9 +69,5 @@ impl App {
     pub fn set_playing_episode_meta(&mut self, title: String, description: String) {
         self.episode_title = title;
         self.episode_description = description;
-    }
-
-    pub fn get_current_episode_meta(&self) -> (&str, &str) {
-        (&self.episode_title, &self.episode_description)
     }
 }
