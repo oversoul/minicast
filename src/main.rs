@@ -2,6 +2,12 @@
 #![warn(unused_imports)]
 extern crate tui;
 
+use tui::{
+    backend::TermionBackend,
+    widgets::{Block, Borders, Clear},
+    Terminal,
+};
+
 mod app;
 mod db;
 mod events;
@@ -16,7 +22,7 @@ use ui::{EpisodeView, FeedView};
 
 use events::{Event, Events};
 use termion::{event::Key, input::MouseTerminal, raw::IntoRawMode, screen::AlternateScreen};
-use tui::{backend::TermionBackend, Terminal};
+//use tui::{backend::TermionBackend, Terminal};
 
 fn main() {
     // Terminal initialization
@@ -44,6 +50,7 @@ fn main() {
     let mut feed: Option<u32> = None;
     let mut title = String::from("");
     let mut description = String::from("");
+    let mut show_popup = false;
 
     loop {
         terminal
@@ -58,6 +65,13 @@ fn main() {
                 f.render_stateful_widget(episode_view.draw(), middle, &mut episode_state.value);
                 f.render_widget(meta_data, right);
                 f.render_widget(player, bottom);
+
+                if show_popup {
+                    let block = Block::default().title("Add Feed").borders(Borders::ALL);
+                    let area = ui::centered_rect(60, 20, f.size());
+                    f.render_widget(Clear, area); //this clears out the background
+                    f.render_widget(block, area);
+                }
             })
             .expect("terminal loop...");
 
@@ -89,6 +103,12 @@ fn main() {
                     } else if feed_view.in_focus() {
                         feed_state.decrement();
                     }
+                }
+                Key::Char('a') => {
+                    show_popup = true;
+                }
+                Key::Esc => {
+                    show_popup = false;
                 }
                 Key::Char('p') => {
                     media.toggle_play().expect("toggle play issue");
@@ -125,12 +145,11 @@ fn main() {
 
                         let episode = app.get_episode(ep_id);
 
-                        let url = episode.url.to_owned();
                         title = episode.title.to_owned();
                         description = episode.description.to_owned();
                         app.set_playing_episode_meta(episode.title, episode.description);
 
-                        media.loadfile(&url).unwrap();
+                        media.loadfile(&episode.url).unwrap();
                     }
                 }
                 _ => {}
