@@ -212,6 +212,77 @@ fn item_to_episode(element: &roxmltree::Node) -> Option<Episode> {
     Some(Episode::new(title, description, url))
 }
 
+pub fn get_episodes(url: String) -> Vec<Episode> {
+    parse_url_episodes(url)
+}
+
+fn parse_xml_string(xml: &str) -> Vec<Episode> {
+    let doc: Result<roxmltree::Document, roxmltree::Error> = roxmltree::Document::parse(&xml);
+
+    if doc.is_err() {
+        return vec![];
+    }
+
+    let doc = doc.unwrap();
+    let rss: roxmltree::Node = doc.root().first_child().unwrap();
+
+    // validate the root tag...
+    if rss.tag_name().name() != "rss" {
+        return vec![];
+    }
+    // validate the rss version
+    if rss.attribute("version") != Some("2.0") {
+        return vec![];
+    }
+
+    let mut episodes = vec![];
+
+    for child in rss.children() {
+        if child.node_type() != roxmltree::NodeType::Element {
+            continue;
+        }
+
+        if child.tag_name().name() != "channel" {
+            continue;
+        }
+
+        for sub_child in child.children() {
+            match sub_child.tag_name().name() {
+                // "link" => self.channel.link = get_element_text(&sub_child).into(),
+                // "title" => self.channel.title = get_element_text(&sub_child).into(),
+                // "description" => self.channel.description = get_element_text(&sub_child).into(),
+                "item" => {
+                    if let Some(episode) = item_to_episode(&sub_child) {
+                        episodes.push(episode);
+                    }
+                }
+                _ => (),
+            }
+        }
+    }
+
+    episodes
+    // panic if there is no channel
+}
+
+fn parse_url_episodes(url: String) -> Vec<Episode> {
+    let response: Result<minreq::Response, minreq::Error> = minreq::get(&url).send();
+    if response.is_err() {
+        return vec![];
+    }
+
+    let response = response.unwrap();
+
+    if response.status_code != 200 {
+        return vec![];
+    }
+
+    match response.as_str() {
+        Ok(content) => parse_xml_string(content),
+        Err(_) => vec![],
+    }
+}
+
 #[cfg(test)]
 use std::env;
 #[cfg(test)]

@@ -3,6 +3,7 @@
 extern crate tui;
 
 mod app;
+mod db;
 mod events;
 mod feed;
 mod player;
@@ -19,8 +20,6 @@ use termion::{event::Key, input::MouseTerminal, raw::IntoRawMode, screen::Altern
 use tui::{backend::TermionBackend, Terminal};
 
 fn main() {
-    //let url = "https://rss.art19.com/smartless";
-
     // Terminal initialization
     let stdout = std::io::stdout().into_raw_mode().expect("std out");
     let stdout = MouseTerminal::from(stdout);
@@ -31,32 +30,18 @@ fn main() {
     let events = Events::new();
     let mut app = app::App::new();
 
-    let feeds = [
-        Feed::from_url("Laracasts", "https://feeds.simplecast.com/sY509q85"),
-        Feed::from_url(
-            "Stuff You Should Know",
-            "https://feeds.megaphone.fm/stuffyoushouldknow",
-        ),
-        Feed::from_url("TED Talks Daily", "https://www.ted.com/feeds/talks.rss"),
-        Feed::from_url("Smartless", "https://rss.art19.com/smartless"),
-        Feed::from_url("Invisibllia", "https://feeds.npr.org/510307/podcast.xml"),
-    ];
-
-    app.set_feeds(feeds.to_vec());
-
-    let feeds_len = &feeds.len();
-
     let mut media = MediaWorker::new().expect("Couldn't open media worker");
 
+    let feeds_len = app.get_feeds_name().len();
     let mut feed_state = State::new();
-    feed_state.set_max(*feeds_len);
+    feed_state.set_max(feeds_len);
 
     let mut episode_state = State::new();
-    let mut feed_view = FeedView::new(feeds.iter().map(|f| f.name.as_str()).collect());
+    let mut feed_view = FeedView::new(app.get_feeds_name());
 
     let mut episode_view = EpisodeView::new(vec![]);
 
-    let mut feed: Option<Feed> = None;
+    let mut feed: Option<u32> = None;
     let mut title = String::from("");
     let mut description = String::from("");
 
@@ -115,27 +100,33 @@ fn main() {
                 Key::Char('s') => {
                     media.stop().expect("Couldn't quit.");
                 }
+                Key::Char('r') => {
+                    if episode_view.in_focus() && feed.is_some() {
+                        app.reload_episodes(feed.unwrap());
+                        // reload view...
+                    }
+                }
                 Key::Char('\n') => {
                     if feed_view.in_focus() {
-                        feed = Some(app.get_feed_by_idx(feed_state.get_value()));
+                        feed = Some(app.get_feed_id(feed_state.get_value()));
 
-                        let episodes = feed.as_ref().unwrap().get_episodes_title();
-                        let eps_len = &episodes.len();
+                        let episodes = app.get_episodes_title(feed.unwrap());
+                        let eps_len = episodes.len();
 
                         feed_view.set_focus(false);
                         episode_view.set_focus(true);
-                        episode_state.set_max(*eps_len);
+                        episode_state.set_max(eps_len);
                         episode_view.set_data(episodes);
                     } else {
                         let ep = episode_state.get_value();
 
-                        let episode = feed.as_ref().unwrap().get_episode_by_index(ep);
-                        title = episode.title.to_owned();
-                        description = episode.description.to_owned();
+                        // let episode = feed.as_ref().unwrap().get_episode_by_index(ep);
+                        // title = episode.title.to_owned();
+                        // description = episode.description.to_owned();
                         //app.set_playing_episode_meta(episode.title, episode.description);
 
-                        let url = episode.url.as_str();
-                        media.loadfile(url).unwrap();
+                        // let url = episode.url.as_str();
+                        // media.loadfile(url).unwrap();
                     }
                 }
                 _ => {}

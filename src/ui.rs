@@ -8,22 +8,26 @@ use tui::{
     widgets::{Block, Borders, Gauge, List, ListItem, Paragraph, Wrap},
 };
 
-pub struct FeedView<'a> {
+pub struct FeedView {
     focus: bool,
-    data: Vec<&'a str>,
+    data: Vec<String>,
 }
 
-impl<'a> FeedView<'a> {
-    pub fn new(data: Vec<&'a str>) -> Self {
+impl FeedView {
+    pub fn new(data: Vec<String>) -> Self {
         FeedView { data, focus: true }
     }
 
-    pub fn set_data(&mut self, data: Vec<&'a str>) {
+    pub fn set_data(&mut self, data: Vec<String>) {
         self.data = data;
     }
 
     pub fn draw(&self) -> List {
-        let items: Vec<ListItem> = self.data.iter().map(|x| ListItem::new(*x)).collect();
+        let items: Vec<ListItem> = self
+            .data
+            .iter()
+            .map(|x| ListItem::new(x.as_str()))
+            .collect();
 
         List::new(items)
             .block(Block::default().title("Feeds").borders(Borders::ALL))

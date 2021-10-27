@@ -1,10 +1,12 @@
-use crate::feed::{Episode, Feed};
+use crate::db::{Database, Episode};
+use crate::feed::Feed;
 
 pub struct App<'a> {
     pub feed: Option<&'a Feed>,
     feeds: Vec<Feed>,
     episode_title: String,
     episode_description: String,
+    db: Database,
 }
 
 impl<'a> App<'a> {
@@ -14,6 +16,7 @@ impl<'a> App<'a> {
             feeds: vec![],
             episode_title: "".into(),
             episode_description: "".into(),
+            db: Database::new().expect("wrong"),
         }
     }
 
@@ -21,25 +24,47 @@ impl<'a> App<'a> {
         self.feeds = feeds;
     }
 
-    pub fn get_feed_by_idx(&mut self, idx: usize) -> Feed {
-        let feed = &mut self.feeds[idx];
-        Feed {
-            name: feed.name.clone(),
-            url: feed.url.clone(),
-            is_url: feed.is_url,
-            path: feed.path.clone(),
-            channel: feed.channel.clone(),
-            episodes: feed.parse_episodes(),
-        }
+    pub fn get_feed_id(&mut self, idx: usize) -> u32 {
+        let feed = &self.db.get_feeds()[idx];
+        feed.id
     }
 
-    pub fn get_feeds_name(&self) -> Vec<&str> {
-        self.feeds.iter().map(|e| e.name.as_str()).collect()
+    pub fn reload_episodes(&self, feed_id: u32) {
+        let feed = self.db.get_feed(feed_id);
+        let episodes = match feed {
+            Ok(f) => crate::feed::get_episodes(f.url),
+            _ => vec![],
+        };
+
+        let episodes = episodes
+            .into_iter()
+            .map(|e| Episode {
+                id: 0,
+                url: e.url,
+                title: e.title,
+                description: e.description,
+            })
+            .collect();
+
+        self.db.set_episodes(feed_id, episodes).unwrap();
+    }
+
+    pub fn get_episodes_title(&self, feed: u32) -> Vec<String> {
+        self.db
+            .get_episodes(feed)
+            .into_iter()
+            .map(|e| e.title)
+            .collect()
+    }
+
+    pub fn get_feeds_name(&self) -> Vec<String> {
+        self.db.get_feeds().into_iter().map(|e| e.name).collect()
     }
 
     pub fn get_episode_by_index(&self, idx: usize) -> Episode {
-        let ep = &self.feed.as_ref().unwrap().episodes[idx];
-        Episode::new_from_ref(ep)
+        // let ep = &self.feed.as_ref().unwrap().episodes[idx];
+        // Episode::new_from_ref(ep)
+        unimplemented!()
     }
 
     pub fn set_playing_episode_meta(&mut self, title: String, description: String) {
