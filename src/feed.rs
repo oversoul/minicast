@@ -5,31 +5,9 @@ extern crate roxmltree;
 use std::io::prelude::*;
 use std::path::PathBuf;
 
-#[derive(Clone)]
-pub struct Feed {
-    pub is_url: bool,
-    pub url: String,
-    pub name: String,
-    pub path: PathBuf,
-    pub channel: Channel,
-    pub episodes: Vec<Episode>,
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Channel {
-    title: String,
-    description: String,
-    link: String,
-}
-
-impl Channel {
-    fn new() -> Self {
-        Channel {
-            title: "".into(),
-            description: "".into(),
-            link: "".into(),
-        }
-    }
+pub enum Feed {
+    Url(String),
+    Path(PathBuf),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -47,15 +25,8 @@ impl Episode {
             url: url.into(),
         }
     }
-
-    pub fn new_from_ref(episode: &Episode) -> Self {
-        Episode {
-            url: episode.url.to_string(),
-            title: episode.title.to_string(),
-            description: episode.description.to_string(),
-        }
-    }
 }
+/*
 
 impl Feed {
     pub fn from_url<T: Into<String>>(name: T, url: T) -> Self {
@@ -177,6 +148,7 @@ impl Feed {
         }
     }
 }
+*/
 
 fn get_element_text<'a>(element: &'a roxmltree::Node) -> &'a str {
     match element.first_child() {
@@ -212,8 +184,11 @@ fn item_to_episode(element: &roxmltree::Node) -> Option<Episode> {
     Some(Episode::new(title, description, url))
 }
 
-pub fn get_episodes(url: String) -> Vec<Episode> {
-    parse_url_episodes(url)
+pub fn get_episodes(feed: Feed) -> Vec<Episode> {
+    match feed {
+        Feed::Path(path) => parse_path_episodes(path),
+        Feed::Url(url) => parse_url_episodes(url),
+    }
 }
 
 fn parse_xml_string(xml: &str) -> Vec<Episode> {
@@ -283,36 +258,27 @@ fn parse_url_episodes(url: String) -> Vec<Episode> {
     }
 }
 
+fn parse_path_episodes(path: PathBuf) -> Vec<Episode> {
+    let file = std::fs::File::open(path).expect("File not found");
+
+    let mut reader = std::io::BufReader::new(file);
+    let mut xml = String::new();
+    reader.read_to_string(&mut xml).expect("couldn't read file");
+
+    parse_xml_string(&xml)
+}
+
 #[cfg(test)]
 use std::env;
 #[cfg(test)]
 use std::path::Path;
 
 #[test]
-fn can_create_new_instance_from_url() {
-    let url = "http://example.com";
-    let feed = Feed::from_url("test", url);
-    assert_eq!(feed.is_url, true);
-    assert_eq!(feed.url, url);
-}
-
-#[test]
-fn can_create_new_instance_from_path() {
-    let mut root_path = env::current_dir().expect("something is wrong with finding current dir.");
-    let path = Path::new("/feeds/valid_basic.xml");
-    root_path.push(path);
-
-    let feed = Feed::from_path("test", root_path.to_path_buf());
-    assert_eq!(feed.is_url, false);
-    assert_eq!(feed.path, path);
-}
-
-#[test]
 fn can_parse_xml_files() {
     let root_path = env::current_dir().expect("something is wrong with finding current dir.");
     let path = root_path.join("feeds/valid_basic.xml");
-    let mut feed = Feed::from_path("test", path.to_path_buf());
-    let episodes = feed.parse_episodes();
+    let feed = Feed::Path(path.to_path_buf());
+    let episodes = get_episodes(feed);
     assert_eq!(episodes.len(), 3);
 }
 
@@ -320,8 +286,8 @@ fn can_parse_xml_files() {
 fn test_feed_validation_complete() {
     let root_path = env::current_dir().expect("something is wrong with finding current dir.");
     let path = root_path.join("feeds/valid_basic.xml");
-    let mut feed = Feed::from_path("test", path.to_path_buf());
-    let episodes = feed.parse_episodes();
+    let feed = Feed::Path(path.to_path_buf());
+    let episodes = get_episodes(feed);
     assert_eq!(episodes.len(), 3);
 }
 
@@ -329,8 +295,8 @@ fn test_feed_validation_complete() {
 fn test_feed_validation_valid_mixed_enclosure() {
     let root_path = env::current_dir().expect("something is wrong with finding current dir.");
     let path = root_path.join("feeds/valid_mixed_enclosures.xml");
-    let mut feed = Feed::from_path("test", path.to_path_buf());
-    let episodes = feed.parse_episodes();
+    let feed = Feed::Path(path.to_path_buf());
+    let episodes = get_episodes(feed);
     assert_eq!(episodes.len(), 2);
 }
 
@@ -338,8 +304,8 @@ fn test_feed_validation_valid_mixed_enclosure() {
 fn test_feed_validations_is_rss() {
     let root_path = env::current_dir().expect("something is wrong with finding current dir.");
     let path = root_path.join("feeds/broken_is_rss.xml");
-    let mut feed = Feed::from_path("test", path.to_path_buf());
-    let episodes = feed.parse_episodes();
+    let feed = Feed::Path(path.to_path_buf());
+    let episodes = get_episodes(feed);
     assert_eq!(episodes.len(), 0);
 }
 
@@ -347,8 +313,9 @@ fn test_feed_validations_is_rss() {
 fn test_feed_validations_is_v2() {
     let root_path = env::current_dir().expect("something is wrong with finding current dir.");
     let path = root_path.join("feeds/broken_is_v2.xml");
-    let mut feed = Feed::from_path("test", path.to_path_buf());
-    let episodes = feed.parse_episodes();
+
+    let feed = Feed::Path(path.to_path_buf());
+    let episodes = get_episodes(feed);
     assert_eq!(episodes.len(), 0);
 }
 
@@ -356,8 +323,9 @@ fn test_feed_validations_is_v2() {
 fn test_feed_validations_rss_empty() {
     let root_path = env::current_dir().expect("something is wrong with finding current dir.");
     let path = root_path.join("feeds/broken_rss_empty.xml");
-    let mut feed = Feed::from_path("test", path.to_path_buf());
-    let episodes = feed.parse_episodes();
+
+    let feed = Feed::Path(path.to_path_buf());
+    let episodes = get_episodes(feed);
     assert_eq!(episodes.len(), 0);
 }
 
@@ -365,8 +333,9 @@ fn test_feed_validations_rss_empty() {
 fn test_feed_validations_has_channel() {
     let root_path = env::current_dir().expect("something is wrong with finding current dir.");
     let path = root_path.join("feeds/broken_has_channel.xml");
-    let mut feed = Feed::from_path("test", path.to_path_buf());
-    let episodes = feed.parse_episodes();
+
+    let feed = Feed::Path(path.to_path_buf());
+    let episodes = get_episodes(feed);
     assert_eq!(episodes.len(), 0);
 }
 
@@ -374,8 +343,9 @@ fn test_feed_validations_has_channel() {
 fn test_feed_validations_channel_children() {
     let root_path = env::current_dir().expect("something is wrong with finding current dir.");
     let path = root_path.join("feeds/broken_channel_children.xml");
-    let mut feed = Feed::from_path("test", path.to_path_buf());
-    let episodes = feed.parse_episodes();
+
+    let feed = Feed::Path(path.to_path_buf());
+    let episodes = get_episodes(feed);
     assert_eq!(episodes.len(), 0);
 }
 
@@ -383,8 +353,9 @@ fn test_feed_validations_channel_children() {
 fn test_feed_validations_channel_empty() {
     let root_path = env::current_dir().expect("something is wrong with finding current dir.");
     let path = root_path.join("feeds/broken_channel_empty.xml");
-    let mut feed = Feed::from_path("test", path.to_path_buf());
-    let episodes = feed.parse_episodes();
+
+    let feed = Feed::Path(path.to_path_buf());
+    let episodes = get_episodes(feed);
     assert_eq!(episodes.len(), 0);
 }
 
@@ -392,8 +363,9 @@ fn test_feed_validations_channel_empty() {
 fn test_feed_validations_two_channels() {
     let root_path = env::current_dir().expect("something is wrong with finding current dir.");
     let path = root_path.join("feeds/valid_two_channels.xml");
-    let mut feed = Feed::from_path("test", path.to_path_buf());
-    let episodes = feed.parse_episodes();
+
+    let feed = Feed::Path(path.to_path_buf());
+    let episodes = get_episodes(feed);
     assert_eq!(episodes.len(), 3);
 }
 
@@ -401,8 +373,9 @@ fn test_feed_validations_two_channels() {
 fn test_feed_validations_item_title() {
     let root_path = env::current_dir().expect("something is wrong with finding current dir.");
     let path = root_path.join("feeds/broken_item_title.xml");
-    let mut feed = Feed::from_path("test", path.to_path_buf());
-    let episodes = feed.parse_episodes();
+
+    let feed = Feed::Path(path.to_path_buf());
+    let episodes = get_episodes(feed);
     assert_eq!(episodes.len(), 0);
 }
 
@@ -410,6 +383,6 @@ fn test_feed_validations_item_title() {
 #[should_panic]
 fn test_feed_load_error() {
     let path = Path::new("notfound");
-    let mut feed = Feed::from_path("test", path.to_path_buf());
-    feed.parse_episodes();
+    let feed = Feed::Path(path.to_path_buf());
+    let _episodes = get_episodes(feed);
 }

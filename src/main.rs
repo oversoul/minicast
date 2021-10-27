@@ -10,7 +10,6 @@ mod player;
 mod state;
 mod ui;
 
-use feed::Feed;
 use player::MediaWorker;
 use state::State;
 use ui::{EpisodeView, FeedView};
@@ -32,12 +31,13 @@ fn main() {
 
     let mut media = MediaWorker::new().expect("Couldn't open media worker");
 
-    let feeds_len = app.get_feeds_name().len();
+    let feeds = app.get_feeds_name();
+    let feeds_len = feeds.len();
     let mut feed_state = State::new();
     feed_state.set_max(feeds_len);
 
     let mut episode_state = State::new();
-    let mut feed_view = FeedView::new(app.get_feeds_name());
+    let mut feed_view = FeedView::new(feeds);
 
     let mut episode_view = EpisodeView::new(vec![]);
 
@@ -63,9 +63,7 @@ fn main() {
 
         match events.next() {
             Ok(Event::Input(input)) => match input {
-                Key::Char('q') => {
-                    break;
-                }
+                Key::Char('q') => break,
                 Key::Down => {
                     if episode_view.in_focus() {
                         episode_state.increment();
@@ -74,18 +72,16 @@ fn main() {
                     }
                 }
                 Key::Left => {
-                    if feed_view.in_focus() {
-                        return;
+                    if !feed_view.in_focus() {
+                        episode_view.set_focus(false);
+                        feed_view.set_focus(true);
                     }
-                    episode_view.set_focus(false);
-                    feed_view.set_focus(true);
                 }
                 Key::Right => {
-                    if episode_view.in_focus() {
-                        return;
+                    if !episode_view.in_focus() {
+                        feed_view.set_focus(false);
+                        episode_view.set_focus(true);
                     }
-                    feed_view.set_focus(false);
-                    episode_view.set_focus(true);
                 }
                 Key::Up => {
                     if episode_view.in_focus() {
@@ -103,7 +99,14 @@ fn main() {
                 Key::Char('r') => {
                     if episode_view.in_focus() && feed.is_some() {
                         app.reload_episodes(feed.unwrap());
+
                         // reload view...
+                        let episodes = app.get_episodes_title(feed.unwrap());
+                        episode_state.set_max(episodes.len());
+
+                        feed_view.set_focus(false);
+                        episode_view.set_focus(true);
+                        episode_view.set_data(episodes);
                     }
                 }
                 Key::Char('\n') => {
@@ -111,22 +114,23 @@ fn main() {
                         feed = Some(app.get_feed_id(feed_state.get_value()));
 
                         let episodes = app.get_episodes_title(feed.unwrap());
-                        let eps_len = episodes.len();
+                        episode_state.reset();
+                        episode_state.set_max(episodes.len());
 
                         feed_view.set_focus(false);
                         episode_view.set_focus(true);
-                        episode_state.set_max(eps_len);
                         episode_view.set_data(episodes);
                     } else {
-                        let ep = episode_state.get_value();
+                        let ep_id = app.get_episode_id(feed.unwrap(), episode_state.get_value());
 
-                        // let episode = feed.as_ref().unwrap().get_episode_by_index(ep);
-                        // title = episode.title.to_owned();
-                        // description = episode.description.to_owned();
-                        //app.set_playing_episode_meta(episode.title, episode.description);
+                        let episode = app.get_episode(ep_id);
 
-                        // let url = episode.url.as_str();
-                        // media.loadfile(url).unwrap();
+                        let url = episode.url.to_owned();
+                        title = episode.title.to_owned();
+                        description = episode.description.to_owned();
+                        app.set_playing_episode_meta(episode.title, episode.description);
+
+                        media.loadfile(&url).unwrap();
                     }
                 }
                 _ => {}

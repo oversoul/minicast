@@ -22,8 +22,10 @@ pub struct Episode {
 impl Database {
     pub fn new() -> Result<Self> {
         let conn = Connection::open_in_memory()?;
+        // let conn = Connection::open("./db.sqlite")?;
+        //
         conn.execute(
-            "CREATE TABLE feeds (
+            "CREATE TABLE IF NOT EXISTS feeds (
                id              INTEGER PRIMARY KEY,
                url             TEXT NOT NULL,
                name            TEXT NOT NULL
@@ -32,7 +34,7 @@ impl Database {
         )?;
 
         conn.execute(
-            "CREATE TABLE episodes (
+            "CREATE TABLE IF NOT EXISTS episodes (
                id              INTEGER PRIMARY KEY,
                url             TEXT NOT NULL,
                title           TEXT NOT NULL,
@@ -57,6 +59,27 @@ impl Database {
         }
 
         Ok(Self { connection: conn })
+    }
+
+    pub fn get_episode(&self, id: u32) -> std::result::Result<Episode, String> {
+        let mut stmt = self
+            .connection
+            .prepare("SELECT id, url, title, description FROM episodes WHERE id = ?1")
+            .expect("couldn't run query");
+
+        let row = stmt.query_row(params![id], |row| {
+            Ok(Episode {
+                id: row.get(0).unwrap_or(0),
+                url: row.get(1).unwrap_or(String::from("")),
+                title: row.get(2).unwrap_or(String::from("")),
+                description: row.get(3).unwrap_or(String::from("")),
+            })
+        });
+
+        match row {
+            Ok(episode) => Ok(episode),
+            Err(_) => Err("no episode.".into()),
+        }
     }
 
     pub fn get_feed(&self, id: u32) -> std::result::Result<Feed, String> {
@@ -107,7 +130,7 @@ impl Database {
     pub fn get_episodes(&self, feed_id: u32) -> Vec<Episode> {
         let mut stmt = self
             .connection
-            .prepare("SELECT id, url, title, description FROM episodes WHERE feed_id = ?1")
+            .prepare("SELECT id, url, title, description, feed_id FROM episodes WHERE feed_id = ?1")
             .expect("couldn't run query");
 
         let rows = stmt.query_map(params![feed_id], |row| {
@@ -128,6 +151,12 @@ impl Database {
                 .collect(),
             _ => Vec::new(),
         }
+    }
+
+    pub fn clear_episodes(&self, feed_id: u32) -> Result<()> {
+        self.connection
+            .execute("DELETE from episodes WHERE feed_id = ?1", params![feed_id])?;
+        Ok(())
     }
 
     pub fn set_episodes(&self, feed_id: u32, episodes: Vec<Episode>) -> Result<()> {

@@ -10,6 +10,10 @@ impl State {
         State { value, max: 0 }
     }
 
+    pub fn reset(&mut self) {
+        self.value.select(Some(0));
+    }
+
     pub fn set_max(&mut self, max: usize) {
         self.max = max;
     }
@@ -20,10 +24,12 @@ impl State {
 
     pub fn increment(&mut self) {
         let value = self.value.selected().unwrap_or(0);
-        if value >= self.max - 1 {
+        if self.max == 0 {
             return;
         }
-        self.value.select(Some(value + 1));
+        if value < self.max - 1 {
+            self.value.select(Some(value + 1));
+        }
     }
 
     pub fn decrement(&mut self) {
@@ -35,4 +41,3 @@ impl State {
         self.value.select(Some(value - 1));
     }
 }
-

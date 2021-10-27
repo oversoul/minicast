@@ -1,4 +1,5 @@
 use crate::db::{Database, Episode};
+use crate::feed;
 use crate::feed::Feed;
 
 pub struct App<'a> {
@@ -20,19 +21,23 @@ impl<'a> App<'a> {
         }
     }
 
-    pub fn set_feeds(&mut self, feeds: Vec<Feed>) {
-        self.feeds = feeds;
-    }
-
     pub fn get_feed_id(&mut self, idx: usize) -> u32 {
         let feed = &self.db.get_feeds()[idx];
         feed.id
     }
 
+    pub fn get_episode_id(&mut self, feed_id: u32, idx: usize) -> u32 {
+        let episodes: Vec<Episode> = self.db.get_episodes(feed_id);
+        episodes[idx].id
+    }
+
     pub fn reload_episodes(&self, feed_id: u32) {
         let feed = self.db.get_feed(feed_id);
+
+        self.db.clear_episodes(feed_id).unwrap();
+
         let episodes = match feed {
-            Ok(f) => crate::feed::get_episodes(f.url),
+            Ok(f) => feed::get_episodes(Feed::Url(f.url)),
             _ => vec![],
         };
 
@@ -61,10 +66,8 @@ impl<'a> App<'a> {
         self.db.get_feeds().into_iter().map(|e| e.name).collect()
     }
 
-    pub fn get_episode_by_index(&self, idx: usize) -> Episode {
-        // let ep = &self.feed.as_ref().unwrap().episodes[idx];
-        // Episode::new_from_ref(ep)
-        unimplemented!()
+    pub fn get_episode(&self, id: u32) -> Episode {
+        self.db.get_episode(id).unwrap()
     }
 
     pub fn set_playing_episode_meta(&mut self, title: String, description: String) {
