@@ -19,6 +19,7 @@ impl MediaWorker {
         handler
             .set_property("vid", "no")
             .expect("Failed to set option 'vid' to 'no'");
+
         Ok(Self {
             handler,
             is_paused: false,
@@ -80,6 +81,11 @@ impl MediaWorker {
     fn playlist_pos(&self) -> Result<usize> {
         let pos: i64 = self.handler.get_property("playlist-pos")?;
         Ok(pos as usize)
+    }
+
+    pub fn percent(&self) -> Result<usize> {
+        let percent: f64 = self.handler.get_property("percent-pos")?;
+        Ok(percent as usize)
     }
 
     pub fn percentage(&self) -> Result<f64> {

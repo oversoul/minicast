@@ -58,8 +58,24 @@ impl App {
             .collect()
     }
 
+    pub fn get_episodes_title_id(&self, feed: u32) -> Vec<(String, u32)> {
+        self.db
+            .get_episodes(feed)
+            .into_iter()
+            .map(|e| (e.title, e.id))
+            .collect()
+    }
+
     pub fn get_feeds_name(&self) -> Vec<String> {
         self.db.get_feeds().into_iter().map(|e| e.name).collect()
+    }
+
+    pub fn get_feeds_name_id(&self) -> Vec<(String, u32)> {
+        self.db
+            .get_feeds()
+            .into_iter()
+            .map(|e| (e.name, e.id))
+            .collect()
     }
 
     pub fn get_episode(&self, id: u32) -> Episode {

@@ -8,9 +8,8 @@ edition = "2018"
 [dependencies]
 roxmltree = "0.14.1"
 minreq = { version = "2.4.2", features = [ "https-rustls" ] }
-tui = "0.16.0"
-termion = "1.5.6"
 libmpv = "2.0.1"
+cursive = "0.16"
 
 [dependencies.rusqlite]
 version = "0.26.0"
