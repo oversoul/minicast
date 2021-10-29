@@ -166,6 +166,7 @@ impl Database {
     pub fn delete_feed(&self, feed_id: u32) -> Result<()> {
         self.connection
             .execute("DELETE from feeds WHERE id = ?1", params![feed_id])?;
+        self.clear_episodes(feed_id)?;
         Ok(())
     }
 
