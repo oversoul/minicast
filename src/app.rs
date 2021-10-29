@@ -66,6 +66,10 @@ impl App {
             .collect()
     }
 
+    pub fn add_feed(&self, name: String, url: String) {
+        self.db.create_feed(name, url).unwrap();
+    }
+
     pub fn get_feeds_name(&self) -> Vec<String> {
         self.db.get_feeds().into_iter().map(|e| e.name).collect()
     }
@@ -80,6 +84,10 @@ impl App {
 
     pub fn get_episode(&self, id: u32) -> Episode {
         self.db.get_episode(id).unwrap()
+    }
+
+    pub fn delete_feed(&self, feed_id: u32) {
+        self.db.delete_feed(feed_id).unwrap();
     }
 
     pub fn set_playing_episode_meta(&mut self, title: String, description: String) {

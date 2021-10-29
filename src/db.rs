@@ -21,9 +21,9 @@ pub struct Episode {
 
 impl Database {
     pub fn new() -> Result<Self> {
-        let conn = Connection::open_in_memory()?;
-        // let conn = Connection::open("./db.sqlite")?;
-        //
+        // let conn = Connection::open_in_memory()?;
+        let conn = Connection::open("./db.sqlite")?;
+
         conn.execute(
             "CREATE TABLE IF NOT EXISTS feeds (
                id              INTEGER PRIMARY KEY,
@@ -51,12 +51,14 @@ impl Database {
             ("Invisibllia", "https://feeds.npr.org/510307/podcast.xml"),
         ];
 
+        /*
         for (name, url) in feeds {
             conn.execute(
                 "INSERT INTO feeds (url, name) VALUES (?1, ?2)",
                 params![url, name],
             )?;
         }
+        */
 
         Ok(Self { connection: conn })
     }
@@ -80,6 +82,14 @@ impl Database {
             Ok(episode) => Ok(episode),
             Err(_) => Err("no episode.".into()),
         }
+    }
+
+    pub fn create_feed(&self, name: String, url: String) -> Result<u32> {
+        self.connection.execute(
+            "INSERT INTO feeds (url, name) VALUES (?1, ?2)",
+            params![url, name],
+        )?;
+        Ok(self.connection.last_insert_rowid() as u32)
     }
 
     pub fn get_feed(&self, id: u32) -> std::result::Result<Feed, String> {
@@ -151,6 +161,12 @@ impl Database {
                 .collect(),
             _ => Vec::new(),
         }
+    }
+
+    pub fn delete_feed(&self, feed_id: u32) -> Result<()> {
+        self.connection
+            .execute("DELETE from feeds WHERE id = ?1", params![feed_id])?;
+        Ok(())
     }
 
     pub fn clear_episodes(&self, feed_id: u32) -> Result<()> {

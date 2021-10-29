@@ -199,12 +199,17 @@ fn parse_xml_string(xml: &str) -> Vec<Episode> {
     }
 
     let doc = doc.unwrap();
-    let rss: roxmltree::Node = doc.root().first_child().unwrap();
+    let rss: Option<roxmltree::Node> = doc
+        .root()
+        .children()
+        .find(|item| item.tag_name().name() == "rss");
 
-    // validate the root tag...
-    if rss.tag_name().name() != "rss" {
+    if rss.is_none() {
         return vec![];
     }
+
+    let rss = rss.unwrap();
+
     // validate the rss version
     if rss.attribute("version") != Some("2.0") {
         return vec![];
