@@ -9,7 +9,7 @@ edition = "2018"
 roxmltree = "0.14.1"
 minreq = { version = "2.4.2", features = [ "https-rustls" ] }
 libmpv = "2.0.1"
-cursive = "0.16"
+cursive = { version = "0.16", features = ["toml"] }
 
 [dependencies.rusqlite]
 version = "0.26.0"

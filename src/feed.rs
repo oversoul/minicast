@@ -391,3 +391,4 @@ fn test_feed_load_error() {
     let feed = Feed::Path(path.to_path_buf());
     let _episodes = get_episodes(feed);
 }
+

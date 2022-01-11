@@ -22,7 +22,7 @@ impl App {
         feeds[idx].id
     }
 
-    pub fn get_episode_id(&mut self, feed_id: u32, idx: usize) -> u32 {
+    fn get_episode_id(&mut self, feed_id: u32, idx: usize) -> u32 {
         let episodes = self.db.get_episodes(feed_id);
         episodes[idx].id
     }

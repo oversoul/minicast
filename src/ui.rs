@@ -1,5 +1,4 @@
 use crate::controller::ControllerMessage;
-//use cursive::view::*;
 use cursive::event::Key;
 use cursive::view::{Nameable, Resizable, Scrollable, SizeConstraint};
 use cursive::views::*;
@@ -13,8 +12,8 @@ pub struct Ui {
 }
 
 pub enum UiMessage {
-    UpdateProgress(usize),
     UpdatePlaying(String, String),
+    UpdateProgress(usize, String),
     UpdateFeeds(Vec<(String, u32)>),
     UpdateEpisodes(Vec<(String, u32)>),
 }
@@ -24,7 +23,9 @@ impl Ui {
     /// by the UI to send messages to the controller.
     pub fn new(controller_tx: mpsc::Sender<ControllerMessage>) -> Ui {
         let (ui_tx, ui_rx) = mpsc::channel::<UiMessage>();
-        let siv = cursive::CursiveRunnable::default();
+
+        let mut siv = cursive::CursiveRunnable::default();
+        siv.load_theme_file("themes/style.toml").unwrap();
         let cursive = siv.into_runner();
 
         let mut ui = Ui {
@@ -60,45 +61,7 @@ impl Ui {
                 .unwrap();
         });
 
-        let controller_tx_clone = ui.controller_tx.clone();
-        ui.cursive.add_global_callback('p', move |_| {
-            controller_tx_clone
-                .send(ControllerMessage::UpdatePlayState)
-                .unwrap();
-        });
-
-        let controller_tx_clone = ui.controller_tx.clone();
-        ui.cursive.add_global_callback('s', move |_| {
-            controller_tx_clone
-                .send(ControllerMessage::UpdateStopPlayer)
-                .unwrap();
-        });
-
-        let controller_tx_clone = ui.controller_tx.clone();
-        ui.cursive.add_global_callback('r', move |s| {
-            let feed = s.find_name::<SelectView<u32>>("feeds").unwrap();
-            match feed.selection() {
-                Some(id) => {
-                    controller_tx_clone
-                        .send(ControllerMessage::ReloadFeedEpisodes(*id))
-                        .unwrap();
-                }
-                _ => (),
-            };
-        });
-
-        let controller_tx_clone = ui.controller_tx.clone();
-        ui.cursive.add_global_callback('d', move |s| {
-            let feed = s.find_name::<SelectView<u32>>("feeds").unwrap();
-            match feed.selection() {
-                Some(id) => {
-                    controller_tx_clone
-                        .send(ControllerMessage::DeleteFeed(*id))
-                        .unwrap();
-                }
-                _ => (),
-            };
-        });
+        ui.add_global_callbacks();
 
         let controller_tx_clone = ui.controller_tx.clone();
         ui.cursive.add_fullscreen_layer(
@@ -116,18 +79,7 @@ impl Ui {
                                     .title("Episodes")
                                     .full_width(),
                             )
-                            .child(
-                                Panel::new(
-                                    LinearLayout::vertical()
-                                        .child(TextView::new("Name:"))
-                                        .child(TextView::new("").with_name("ep_title"))
-                                        .child(TextView::new("\nDescription:"))
-                                        .child(TextView::new("").with_name("ep_description")),
-                                )
-                                .title("Details")
-                                .full_height()
-                                .full_width(),
-                            ),
+                            .child(details_view()),
                     )
                     .child(Panel::new(
                         ProgressBar::new().with_name("progress").full_width(),
@@ -139,9 +91,51 @@ impl Ui {
             }),
         );
 
-        ui.cursive.add_global_callback('q', |s| s.quit());
-
         ui
+    }
+
+    fn add_global_callbacks(&mut self) {
+        let controller_tx_clone = self.controller_tx.clone();
+        self.cursive.add_global_callback('p', move |_| {
+            controller_tx_clone
+                .send(ControllerMessage::UpdatePlayState)
+                .unwrap();
+        });
+
+        let controller_tx_clone = self.controller_tx.clone();
+        self.cursive.add_global_callback('s', move |_| {
+            controller_tx_clone
+                .send(ControllerMessage::UpdateStopPlayer)
+                .unwrap();
+        });
+
+        let controller_tx_clone = self.controller_tx.clone();
+        self.cursive.add_global_callback('r', move |s| {
+            let feed = s.find_name::<SelectView<u32>>("feeds").unwrap();
+            match feed.selection() {
+                Some(id) => {
+                    controller_tx_clone
+                        .send(ControllerMessage::ReloadFeedEpisodes(*id))
+                        .unwrap();
+                }
+                _ => (),
+            };
+        });
+
+        let controller_tx_clone = self.controller_tx.clone();
+        self.cursive.add_global_callback('d', move |s| {
+            let feed = s.find_name::<SelectView<u32>>("feeds").unwrap();
+            match feed.selection() {
+                Some(id) => {
+                    controller_tx_clone
+                        .send(ControllerMessage::DeleteFeed(*id))
+                        .unwrap();
+                }
+                _ => (),
+            };
+        });
+
+        self.cursive.add_global_callback('q', |s| s.quit());
     }
 
     /// Step the UI by calling into Cursive's step function, then
@@ -175,9 +169,10 @@ impl Ui {
                     self.cursive
                         .call_on_name("ep_description", |v: &mut TextView| v.set_content(d));
                 }
-                UiMessage::UpdateProgress(value) => {
+                UiMessage::UpdateProgress(value, format) => {
                     let mut output = self.cursive.find_name::<ProgressBar>("progress").unwrap();
                     output.set_value(value);
+                    output.set_label(move |v, _| format!("{}  {} %", format, v));
                 }
             }
         }
@@ -232,4 +227,17 @@ fn save_new_feed(s: &mut cursive::Cursive, c: &mpsc::Sender<ControllerMessage>) 
     c.send(ControllerMessage::AddNewFeed(name, url)).unwrap();
     s.pop_layer();
     Some(())
+}
+
+fn details_view() -> impl cursive::View {
+    Panel::new(
+        LinearLayout::vertical()
+            .child(TextView::new("Name:"))
+            .child(TextView::new("").with_name("ep_title"))
+            .child(TextView::new("\nDescription:"))
+            .child(TextView::new("").with_name("ep_description")),
+    )
+    .title("Details")
+    .full_height()
+    .full_width()
 }

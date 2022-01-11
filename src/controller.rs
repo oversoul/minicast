@@ -38,7 +38,10 @@ impl Controller {
             if !self.media.is_paused {
                 self.ui
                     .ui_tx
-                    .send(UiMessage::UpdateProgress(self.media.percent().unwrap_or(0)))
+                    .send(UiMessage::UpdateProgress(
+                        self.media.percent().unwrap_or(0),
+                        self.media.time_position().unwrap_or("".into()),
+                    ))
                     .unwrap();
             }
             while let Some(message) = self.rx.try_iter().next() {
